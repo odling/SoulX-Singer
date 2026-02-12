@@ -19,7 +19,9 @@ from .g2p import g2p_transform
 DEFAULT_LANGUAGE = "English"
 MAX_GAP_SEC = 5.0  # gap (sec) above which we start a new segment
 MAX_SEGMENT_DUR_SUM_SEC = 60.0  # max cumulative note duration per segment (sec)
+MIN_GAP_THRESHOLD_SEC = 0.001  # ignore gaps smaller than this
 LONG_SILENCE_THRESHOLD_SEC = 0.05  # treat as separate <SP> if gap larger
+MAX_LEADING_SP_DUR_SEC = 2.0  # cap leading silence in a segment to this (sec)
 
 # F0 synthesis constants
 F0_FRAME_RATE_HZ = 50  # frames per second for f0 (20ms per frame)
@@ -207,6 +209,18 @@ def midi2notes(midi_path: str) -> List[Note]:
     return result
 
 
+def _new_segment() -> dict:
+    """Create a fresh empty segment dict."""
+    return {
+        "note_text": [],
+        "note_dur": [],
+        "note_pitch": [],
+        "note_type": [],
+        "start_time_ms": 0,
+        "end_time_ms": 0,
+    }
+
+
 def notes_to_segments(notes: List[Note]) -> List[dict]:
     """
     Convert a list of Notes into segments with proper gap handling.
@@ -219,43 +233,50 @@ def notes_to_segments(notes: List[Note]) -> List[dict]:
         return []
     
     segments = []
-    current_segment = {
-        "note_text": [],
-        "note_dur": [],
-        "note_pitch": [],
-        "note_type": [],
-        "start_time_ms": 0,
-        "end_time_ms": 0,
-    }
-    
+    current_segment = _new_segment()
     prev_end = 0.0
     dur_sum = 0.0
     
     for note in notes:
         gap = note.start_s - prev_end
         
+        # Cap leading silence: if last entry is a long <SP>, trim and save segment
+        if (
+            current_segment["note_text"]
+            and current_segment["note_text"][-1] == "<SP>"
+            and current_segment["note_dur"][-1] > MAX_LEADING_SP_DUR_SEC
+        ):
+            current_segment["note_dur"][-1] = MAX_LEADING_SP_DUR_SEC
+            # Update end_time_ms to reflect trimmed duration
+            total_dur_ms = int(sum(current_segment["note_dur"]) * 1000)
+            current_segment["end_time_ms"] = current_segment["start_time_ms"] + total_dur_ms
+            segments.append(current_segment)
+            current_segment = _new_segment()
+            prev_end = note.start_s
+            dur_sum = 0.0
+            gap = 0.0
+        
         # Check if we need to start a new segment
         if gap >= MAX_GAP_SEC or dur_sum >= MAX_SEGMENT_DUR_SUM_SEC:
             if current_segment["note_text"]:
                 segments.append(current_segment)
-                current_segment = {
-                    "note_text": [],
-                    "note_dur": [],
-                    "note_pitch": [],
-                    "note_type": [],
-                    "start_time_ms": 0,
-                    "end_time_ms": 0,
-                }
+                current_segment = _new_segment()
                 dur_sum = 0.0
         
-        # Add silence gap as <SP> if needed
-        if gap > LONG_SILENCE_THRESHOLD_SEC:
-            if not current_segment["note_text"]:
-                current_segment["start_time_ms"] = int(prev_end * 1000)
-            current_segment["note_text"].append("<SP>")
-            current_segment["note_dur"].append(gap)
-            current_segment["note_pitch"].append(0)
-            current_segment["note_type"].append(1)
+        # Handle gaps between notes
+        if gap > MIN_GAP_THRESHOLD_SEC:
+            if gap > LONG_SILENCE_THRESHOLD_SEC or not current_segment["note_text"]:
+                # Insert <SP> for larger gaps or at segment start
+                if not current_segment["note_text"]:
+                    current_segment["start_time_ms"] = int(prev_end * 1000)
+                current_segment["note_text"].append("<SP>")
+                current_segment["note_dur"].append(gap)
+                current_segment["note_pitch"].append(0)
+                current_segment["note_type"].append(1)
+            else:
+                # Extend previous note's duration to fill small gaps
+                if current_segment["note_dur"]:
+                    current_segment["note_dur"][-1] += gap
         
         # Add the note
         if not current_segment["note_text"]:
@@ -413,7 +434,7 @@ def midi2meta_pure(
     
     print(f"Saved metadata to {output_path}")
     print(f"  - {len(metadata)} segment(s)")
-    print(f"  - {sum(len(s['note_text'].split()) for s in metadata)} total notes")
+    print(f"  - {sum(len(s['text'].split()) for s in metadata)} total notes")
     
     return metadata
 

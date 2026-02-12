@@ -405,30 +405,17 @@ The original parser is fully bidirectional, which is useful for round-tripping (
 
 ## Potential Issues and Areas of Improvement for the Pure Parser
 
-### 1. Missing Small-Gap Duration Extension (Bug Risk)
+### 1. ~~Missing Small-Gap Duration Extension~~ -- FIXED
 
-**Problem**: Gaps between 0.001s and 0.05s are silently dropped, causing a timing discrepancy between the sum of note durations and the segment's declared time range.
+Gaps between 0.001s and 0.05s now extend the previous note's duration to fill the gap, matching the original parser's behavior. Added `MIN_GAP_THRESHOLD_SEC = 0.001` constant.
 
-**Fix**: Add the same small-gap extension logic from the original:
+### 2. ~~No Leading Silence Cap~~ -- FIXED
 
-```python
-# In notes_to_segments(), after checking for long gaps:
-elif gap > 0.001:  # Small gap - extend previous note
-    if current_segment["note_dur"]:
-        current_segment["note_dur"][-1] += gap
-```
+Added `MAX_LEADING_SP_DUR_SEC = 2.0`. When a segment's trailing `<SP>` exceeds 2 seconds, the SP is trimmed and the segment is saved before starting a new one.
 
-### 2. No Leading Silence Cap
+### 3. F0 Frame Rate -- VERIFIED CORRECT
 
-**Problem**: Segments can start with arbitrarily long silences, wasting model compute.
-
-**Fix**: Add a `MAX_LEADING_SP_DUR_SEC` constant and split segments when leading silence exceeds it, mirroring the original's behavior.
-
-### 3. F0 Frame Rate Mismatch
-
-**Problem**: The pure parser uses 50 Hz (20ms frames), but the actual downstream model may expect a different frame rate. The original parser's F0 frame rate is determined by the RMVPE model's configuration (typically 10ms hop at 16kHz, then interpolated to the target sample rate's hop size). If the model expects a specific frame rate, the pure parser's 50 Hz assumption may be wrong.
-
-**Fix**: Make `F0_FRAME_RATE_HZ` configurable or match it to the model's expected hop size. Check what frame rate the training pipeline expects and use that.
+The pure parser uses `F0_FRAME_RATE_HZ = 50` (20ms per frame). The F0Extractor uses `target_sr=24000` and `hop_size=480`, giving `24000/480 = 50 Hz`. These already match -- no change needed.
 
 ### 4. Flat F0 May Reduce Model Quality
 
@@ -457,13 +444,105 @@ elif gap > 0.001:  # Small gap - extend previous note
 
 ---
 
+## Control Types: Melody vs Score
+
+The SoulX-Singer model supports two control modes that determine **how the model knows what pitch to sing**. This is configured via the `control` parameter (visible as "Control type" in the web UI). Understanding this distinction is critical when deciding whether you need a WAV file or not.
+
+### What the Model Receives
+
+The metadata JSON contains two pitch-related fields:
+
+| Field | What it is | Example |
+|-------|-----------|---------|
+| `note_pitch` | MIDI note numbers (discrete integers, one per note) | `"0 53 53 0 53 55 54"` |
+| `f0` | Frame-level frequency contour in Hz (continuous, one value per 20ms frame) | `"0.0 0.0 174.6 174.6 196.0 185.0"` |
+
+Both fields are **always present** in the metadata. The `control` parameter tells the model which one to **pay attention to** and which one to **ignore**.
+
+### Score Mode (`control="score"`)
+
+**What the model uses**: `note_pitch` (MIDI note numbers)
+**What the model ignores**: `f0` (zeroed out internally)
+
+In score mode, the model reads the MIDI note numbers to know what pitch to sing. Think of it like reading sheet music -- the model sees "sing note 53 (F3) for 0.5 seconds, then note 55 (G3) for 0.3 seconds" and decides on its own how to transition between those notes, how much vibrato to add, and how the pitch should move within each note.
+
+**How it works internally**:
+1. The `note_pitch` values (integers 0-127) are fed into a `note_pitch_encoder` (a learned embedding table)
+2. The `f0` values are replaced with all zeros, so the `f0_encoder` receives silence tokens and contributes no pitch information
+3. The model generates the actual pitch expression (vibrato, slides, etc.) from its learned knowledge of singing
+
+**Analogy**: You hand a singer sheet music with note names. They read the notes and sing them with their own style and expression.
+
+### Melody Mode (`control="melody"`)
+
+**What the model uses**: `f0` (frame-level frequency contour)
+**What the model ignores**: `note_pitch` (zeroed out internally)
+
+In melody mode, the model reads a detailed pitch contour -- a frequency value for every 20-millisecond frame. This contour tells the model exactly how the pitch should move over time, including vibrato, pitch slides between notes, and natural pitch drift.
+
+**How it works internally**:
+1. The `f0` values (Hz) are quantized into 361 discrete bins using: `bin = round(1200 * log2(f0 / 32.7) / 20) + 1` (bin 0 = silence)
+2. These bins are fed into an `f0_encoder` (a learned embedding table)
+3. The `note_pitch` values are replaced with all zeros, so the `note_pitch_encoder` receives silence tokens and contributes no pitch information
+4. The model follows the provided pitch contour closely when generating audio
+
+**Analogy**: You play a melody on a keyboard and tell the singer "follow this exact pitch, including all the wobbles and slides."
+
+### Both Encoders Always Run
+
+An important detail: the model **always** runs both `note_pitch_encoder` and `f0_encoder`, and **adds their outputs together**. The control mode simply determines which one receives real data vs zeros:
+
+```
+features = note_pitch_encoder(note_pitch) + note_type_encoder(note_type) + note_text_encoder(note_text)
+features = preflow(features)
+features = expand_states(features, mel2note)
+features = features + f0_encoder(f0_coarse)
+```
+
+| Mode | `note_pitch_encoder` input | `f0_encoder` input |
+|------|---------------------------|-------------------|
+| Score | Real MIDI note numbers | All zeros (silence bins) |
+| Melody | All zeros | Real F0 bins from contour |
+
+### Auto Pitch Shift
+
+Both modes support automatic pitch shifting to match the target song's key to the prompt singer's range:
+
+- **Score mode**: Compares median `note_pitch` of target vs prompt (integer semitone difference)
+- **Melody mode**: Compares median `f0` of target vs prompt (Hz ratio converted to semitones via `log2(ratio) * 1200 / 100`)
+
+### Which Mode to Use with the Pure Parser (No WAV)
+
+This is the key question for the MIDI-only workflow:
+
+**Score mode is the natural choice.** Here's why:
+
+- The pure parser starts with MIDI note numbers (the `note_pitch` field). These are the exact, correct discrete pitches from the MIDI file. Score mode uses these directly.
+- The synthesized flat F0 in the metadata is **completely ignored** in score mode (zeroed out). So the quality of the F0 doesn't matter at all.
+- The model generates its own pitch expression (vibrato, slides, etc.) from learned singing behavior, producing natural-sounding output.
+
+**Melody mode works but is suboptimal.** Here's why:
+
+- The pure parser synthesizes a flat F0 contour from MIDI pitches: each note is a constant frequency with no variation (e.g., `174.6 174.6 174.6 174.6` for every frame of a note).
+- The model tries to follow this flat contour exactly, which means it may produce output with less vibrato and less natural pitch movement than it would in score mode.
+- Real F0 from audio (used by the original WAV-based parser) contains natural vibrato, pitch slides between notes, and micro-variations that make melody mode sound expressive. The flat synthesized F0 lacks all of this.
+- If you have an existing vocal recording and want the model to closely replicate its pitch nuances, melody mode with real F0 (from the WAV parser) is the right choice. Without a recording, score mode is better.
+
+### Summary Table
+
+| Scenario | Recommended Mode | Why |
+|----------|-----------------|-----|
+| Have a vocal recording, want to match its exact pitch movement | **Melody** (with WAV parser) | Real F0 captures vibrato, slides, expression |
+| No recording, composing from MIDI/sheet music | **Score** (with pure parser) | Model generates its own expression from note numbers |
+| Have a vocal recording but only care about the notes, not expression | **Score** (either parser) | Let the model decide expression |
+| No recording, want specific pitch contour control | **Melody** (with pure parser) | Works but output will follow flat pitch rigidly |
+
+---
+
 ## Summary
 
 The pure parser successfully eliminates the need for audio files, GPU access, and the RMVPE model. It produces structurally identical metadata JSON. The main tradeoffs are:
 
-1. **F0 quality**: Synthesized (flat) vs extracted (expressive) -- this is the biggest quality impact
-2. **Gap handling**: Slightly different behavior for very small gaps -- this is a bug that should be fixed
-3. **Leading silence**: No cap in the pure parser -- minor issue, should be added
-4. **Frame rate**: Hardcoded 50 Hz may not match model expectations -- should be verified
+1. **F0 quality**: Synthesized (flat) vs extracted (expressive) -- this is the only remaining functional difference
 
-For use cases where the goal is to generate training data from scratch (no existing vocal recording), the pure parser is the right choice. The flat F0 concern can be mitigated by adding synthetic expressiveness or by training/fine-tuning the model on pure-parser output.
+For use cases where the goal is to generate from scratch (no existing vocal recording), the pure parser paired with **score mode** is the ideal combination. The model uses the MIDI note numbers directly and generates its own pitch expression, making the flat F0 irrelevant. Melody mode with the pure parser is possible but produces less expressive results since the model follows the flat contour.
