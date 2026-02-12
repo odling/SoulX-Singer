@@ -115,13 +115,13 @@ class VocalSeparator:
         *,
         model_type: str = "mel_band_roformer",
         disable_detailed_pbar: bool = True,
-        device: str = "cuda",
+        device: str = "mps",
         verbose: bool = True,
     ):
         """Initialize the vocal separator.
 
         Args:
-            device: Torch device string, e.g. ``"cuda:0"``.
+            device: Torch device string, e.g. ``"mps"``.
             model_type: Separation model type key.
             sep_config_path: Config path for separation model.
             sep_start_check_point: Checkpoint path for separation model.
@@ -181,14 +181,22 @@ class VocalSeparator:
 
         self.args.input_path = input_path
 
+        device_obj = torch.device(self.device) if not isinstance(self.device, torch.device) else self.device
+        
         mix, vocals, dereverbed, accompaniment, sample_rate = main(
             self.args,
             self.sep_model,
             self.sep_config,
             self.dereverb_model,
             self.dereverb_config,
-            torch.device(self.device) if not isinstance(self.device, torch.device) else self.device,
+            device_obj,
         )
+        
+        # Clear GPU/MPS memory after processing
+        if device_obj.type == 'mps':
+            torch.mps.empty_cache()
+        elif device_obj.type == 'cuda':
+            torch.cuda.empty_cache()
 
         if verbose:
             dt = time.time() - t0
@@ -218,7 +226,7 @@ if __name__ == "__main__":
         sep_config_path="pretrained_models/mel-band-roformer-karaoke/config_karaoke_becruily.yaml",
         der_model_path="pretrained_models/dereverb_mel_band_roformer/dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
         der_config_path="pretrained_models/dereverb_mel_band_roformer/dereverb_mel_band_roformer_anvuew.yaml",
-        device="cuda"
+        device="mps"
     )
 
     out = m.process("example/test/separation_test.mp3")

@@ -51,10 +51,16 @@ class Attend(nn.Module):
         self.flash = flash
         assert not (flash and version.parse(torch.__version__) < version.parse('2.0.0')), 'in order to use flash attention, you must be using pytorch 2.0 or above'
 
-        # determine efficient attention configs for cuda and cpu
+        # determine efficient attention configs for cuda, mps and cpu
 
         self.cpu_config = FlashAttentionConfig(True, True, True)
         self.cuda_config = None
+        self.mps_config = FlashAttentionConfig(True, True, True)  # MPS supports scaled_dot_product_attention
+
+        # Check for MPS (Apple Silicon) first
+        if torch.backends.mps.is_available():
+            print_once('MPS (Apple Silicon) detected, using efficient attention')
+            return
 
         if not torch.cuda.is_available() or not flash:
             return
@@ -75,22 +81,33 @@ class Attend(nn.Module):
 
     def flash_attn(self, q, k, v):
         _, heads, q_len, _, k_len, is_cuda, device = *q.shape, k.shape[-2], q.is_cuda, q.device
+        is_mps = device.type == 'mps'
 
         if exists(self.scale):
             default_scale = q.shape[-1] ** -0.5
             q = q * (self.scale / default_scale)
 
         # Check if there is a compatible device for flash attention
-
-        config = self.cuda_config if is_cuda else self.cpu_config
+        if is_mps:
+            config = self.mps_config
+        elif is_cuda:
+            config = self.cuda_config
+        else:
+            config = self.cpu_config
 
         # pytorch 2.0 flash attn: q, k, v, mask, dropout, softmax_scale
-
-        with torch.backends.cuda.sdp_kernel(**config._asdict()):
+        # MPS doesn't support sdp_kernel context manager, use direct call
+        if is_mps:
             out = F.scaled_dot_product_attention(
                 q, k, v,
                 dropout_p = self.dropout if self.training else 0.
             )
+        else:
+            with torch.backends.cuda.sdp_kernel(**config._asdict()):
+                out = F.scaled_dot_product_attention(
+                    q, k, v,
+                    dropout_p = self.dropout if self.training else 0.
+                )
 
         return out
 

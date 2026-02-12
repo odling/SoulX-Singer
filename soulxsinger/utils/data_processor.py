@@ -15,7 +15,7 @@ class DataProcessor:
                 hop_size: int, 
                 sample_rate: int, 
                 phoneset_path: str = 'soulxsinger/utils/phoneme/phone_set.json',
-                device: str = 'cuda',
+                device: str = 'mps',
                 prompt_append_duration: float = 0.5):
         """Initialize data processor.
 

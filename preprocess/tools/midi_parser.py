@@ -156,7 +156,7 @@ def _append_segment_to_meta(
     })
 
 
-def convert_meta(meta_data: List[dict], rmvpe_model_path, device="cuda"):
+def convert_meta(meta_data: List[dict], rmvpe_model_path, device="mps"):
     pitch_extractor = F0Extractor(rmvpe_model_path, device=device, verbose=False)
     converted_data = []
 
@@ -186,7 +186,7 @@ def _edit_data_to_meta(
     edit_data: List[dict],
     vocal_file: str,
     rmvpe_model_path: str | None = None,
-    device: str = "cuda",
+    device: str = "mps",
 ) -> None:
     """Write SoulX-Singer metadata JSON from edit_data (list of {start, end, note_text, note_pitch, note_type})."""
     # Use a fixed temporary directory for cut wavs
@@ -340,7 +340,7 @@ def notes2meta(
     meta_path: str,
     vocal_file: str,
     rmvpe_model_path: str | None = None,
-    device: str = "cuda",
+    device: str = "mps",
 ) -> None:
     """Write SoulX-Singer metadata JSON from a list of Note (segmenting + wav cuts)."""
     edit_data = [
@@ -598,7 +598,7 @@ def midi2meta(
     meta_path: str,
     vocal_file: str,
     rmvpe_model_path: str | None = None,
-    device: str = "cuda",
+    device: str = "mps",
 ) -> None:
     """Convert MIDI file to SoulX-Singer metadata JSON (midi -> List[Note] -> meta)."""
     meta_dir = os.path.dirname(meta_path)
@@ -645,7 +645,7 @@ if __name__ == "__main__":
         "--device",
         type=str,
         help="Device to use for RMVPE",
-        default="cuda",
+        default="mps",
     )
     args = parser.parse_args()
 

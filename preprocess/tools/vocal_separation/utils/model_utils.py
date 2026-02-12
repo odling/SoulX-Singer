@@ -55,6 +55,10 @@ def demix(
         mode = 'demucs'
     else:
         mode = 'generic'
+    
+    # Check if using MPS (Apple Silicon) for memory optimization
+    is_mps = device.type == 'mps' if hasattr(device, 'type') else (str(device) == 'mps')
+    
     # Define processing parameters based on the mode
     if mode == 'demucs':
         chunk_size = config.training.samplerate * config.training.segment
@@ -66,6 +70,14 @@ def demix(
             chunk_size = config.inference.chunk_size
         else:
             chunk_size = config.audio.chunk_size
+        
+        # Reduce chunk size for MPS to avoid memory allocation errors
+        if is_mps:
+            # Use smaller chunk size (about 6 seconds at 44100Hz) to fit in MPS memory
+            max_mps_chunk = 44100 * 6  # ~6 seconds
+            if chunk_size > max_mps_chunk:
+                chunk_size = max_mps_chunk
+        
         num_instruments = len(prefer_target_instrument(config))
         num_overlap = config.inference.num_overlap
 
@@ -79,10 +91,18 @@ def demix(
             mix = nn.functional.pad(mix, (border, border), mode="reflect")
 
     batch_size = config.inference.batch_size
+    
+    # Reduce batch size for MPS to avoid memory issues (is_mps already computed above)
+    if is_mps:
+        batch_size = min(batch_size, 1)  # MPS has limited memory, use batch size of 1
 
     use_amp = getattr(config.training, 'use_amp', True)
 
-    with torch.cuda.amp.autocast(enabled=use_amp):
+    # Use device-agnostic autocast - disable AMP on MPS for stability
+    device_type = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
+    # Disable AMP on MPS as it can cause memory issues
+    amp_enabled = use_amp and device_type == 'cuda'
+    with torch.amp.autocast(device_type=device_type, enabled=amp_enabled):
         with torch.inference_mode():
             # Initialize result and counter tensors
             req_shape = (num_instruments,) + mix.shape
@@ -135,6 +155,10 @@ def demix(
 
                     batch_data.clear()
                     batch_locations.clear()
+                    
+                    # Clear MPS cache periodically to prevent memory buildup
+                    if is_mps:
+                        torch.mps.empty_cache()
 
                 if progress_bar:
                     progress_bar.update(step)
@@ -222,9 +246,9 @@ def initialize_model_and_device(model: torch.nn.Module, device_ids: List[int]) -
     """
     Move a model to the correct computation device and wrap with DataParallel if needed.
 
-    Selects GPU(s) if CUDA is available; otherwise defaults to CPU. If multiple
-    GPU IDs are provided, wraps the model with `nn.DataParallel` for multi-GPU
-    execution.
+    Selects MPS (Apple Silicon), GPU(s) if CUDA is available; otherwise defaults to CPU.
+    If multiple GPU IDs are provided (CUDA only), wraps the model with `nn.DataParallel`
+    for multi-GPU execution.
 
     Args:
         model (torch.nn.Module): PyTorch model to be initialized.
@@ -237,7 +261,11 @@ def initialize_model_and_device(model: torch.nn.Module, device_ids: List[int]) -
             - The model moved to that device (wrapped in DataParallel if applicable).
     """
 
-    if torch.cuda.is_available():
+    if torch.backends.mps.is_available():
+        device = torch.device('mps')
+        model = model.to(device)
+        print("Using MPS (Apple Silicon).")
+    elif torch.cuda.is_available():
         if len(device_ids) <= 1:
             device = torch.device(f'cuda:{device_ids[0]}')
             model = model.to(device)
@@ -247,7 +275,7 @@ def initialize_model_and_device(model: torch.nn.Module, device_ids: List[int]) -
     else:
         device = 'cpu'
         model = model.to(device)
-        print("CUDA is not available. Running on CPU.")
+        print("MPS and CUDA are not available. Running on CPU.")
 
     return device, model
 

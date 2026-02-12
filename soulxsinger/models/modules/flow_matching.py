@@ -408,7 +408,7 @@ if __name__ == "__main__":
         "time_scheduler": "cos",
     }
 
-    device = "cuda"
+    device = "mps"
     x = torch.randn(2, 100, 128).to(device)
     x_mask = torch.ones(2, 100).to(device)
     # cond_code = torch.randint(0, 16384, (2, 25)).to(device)

@@ -16,7 +16,7 @@ save_dir=example/generated/music
 control=score  # melody or score
 
 python -m cli.inference \
-    --device cuda \
+    --device mps \
     --model_path $model_path \
     --config $config \
     --prompt_wav_path $prompt_wav_path \

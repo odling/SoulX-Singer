@@ -17,7 +17,7 @@ class RMVPE:
     def __init__(self, model_path, hop_length=160, device=None):
         self.resample_kernel = {}
         if device is None:
-            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            self.device = 'mps' if torch.backends.mps.is_available() else 'cpu'
         else:
             self.device = device
         self.model = E2E0(4, 1, (2, 2)).eval().to(self.device)
@@ -129,6 +129,6 @@ class RMVPE:
             uvs_res.append(uv_res)
         return f0s_res, uvs_res
 
-    def release_cuda(self):
+    def release_device(self):
         self.model = self.model.cpu()
         self.mel_extractor = self.mel_extractor.cpu()

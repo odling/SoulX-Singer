@@ -640,7 +640,17 @@ class MelBandRoformer(Module):
         scatter_indices = repeat(self.freq_indices, 'f -> b n f t', b=batch, n=num_stems, t=stft_repr.shape[-1])
 
         stft_repr_expanded_stems = repeat(stft_repr, 'b 1 ... -> b n ...', n=num_stems)
-        masks_summed = torch.zeros_like(stft_repr_expanded_stems).scatter_add_(2, scatter_indices, masks)
+        
+        # MPS doesn't support scatter_add_ on complex tensors, use workaround
+        if stft_repr_expanded_stems.is_complex() and stft_repr_expanded_stems.device.type == 'mps':
+            # Convert complex to real view, perform scatter, convert back
+            stft_real = torch.view_as_real(stft_repr_expanded_stems)  # (..., 2)
+            masks_real = torch.view_as_real(masks)
+            scatter_indices_expanded = scatter_indices.unsqueeze(-1).expand_as(masks_real)
+            result_real = torch.zeros_like(stft_real).scatter_add_(2, scatter_indices_expanded, masks_real)
+            masks_summed = torch.view_as_complex(result_real)
+        else:
+            masks_summed = torch.zeros_like(stft_repr_expanded_stems).scatter_add_(2, scatter_indices, masks)
 
         denom = repeat(self.num_bands_per_freq, 'f -> (f r) 1', r=channels)
 

@@ -3,7 +3,7 @@ import subprocess
 import traceback
 from datetime import datetime
 
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 import numpy as np
 import torch.optim
 import torch.utils.data
@@ -20,7 +20,7 @@ import tqdm
 from .ckpt_utils import get_last_checkpoint, get_all_ckpts
 from .ddp_utils import DDP
 from .hparams import hparams
-from .tensor_utils import move_to_cuda
+from .tensor_utils import move_to_device
 
 
 class Tee(object):
@@ -92,13 +92,14 @@ class Trainer:
         self.best_val_results = np.Inf if monitor_mode == 'min' else -np.Inf
         self.mode = 'min'
 
-        # allow int, string and gpu list
+        # Check for MPS (Apple Silicon) or CUDA availability
+        self.use_mps = torch.backends.mps.is_available()
         self.all_gpu_ids = [
             int(x) for x in os.environ.get("CUDA_VISIBLE_DEVICES", "").split(",") if x != '']
-        self.num_gpus = len(self.all_gpu_ids)
-        self.on_gpu = self.num_gpus > 0
+        self.num_gpus = len(self.all_gpu_ids) if not self.use_mps else 1
+        self.on_gpu = self.use_mps or self.num_gpus > 0
         self.root_gpu = 0
-        logging.info(f'GPU available: {torch.cuda.is_available()}, GPU used: {self.all_gpu_ids}')
+        logging.info(f'MPS available: {self.use_mps}, GPU available: {torch.cuda.is_available() if not self.use_mps else False}, GPU used: {self.all_gpu_ids}')
         self.use_ddp = self.num_gpus > 1
         self.proc_rank = 0
         # Tensorboard logging
@@ -130,7 +131,8 @@ class Trainer:
             sys.stderr = open(os.devnull, "w")
         task = task_cls()
         task.trainer = self
-        torch.cuda.set_device(gpu_idx)
+        if not self.use_mps:
+            torch.cuda.set_device(gpu_idx)
         self.root_gpu = gpu_idx
         self.task = task
         self.run_single_process(task)
@@ -153,7 +155,10 @@ class Trainer:
         if checkpoint is not None:
             self.restore_weights(checkpoint)
         elif self.on_gpu:
-            task.cuda(self.root_gpu)
+            if self.use_mps:
+                task.to('mps')
+            else:
+                task.cuda(self.root_gpu)
         if not self.testing:
             self.optimizers = task.configure_optimizers()
             self.fisrt_epoch = True
@@ -162,7 +167,10 @@ class Trainer:
         del checkpoint
         # clear cache after restore
         if self.on_gpu:
-            torch.cuda.empty_cache()
+            if self.use_mps:
+                torch.mps.empty_cache()
+            else:
+                torch.cuda.empty_cache()
 
         if self.use_ddp:
             self.task = self.configure_ddp(self.task)
@@ -228,7 +236,8 @@ class Trainer:
 
             # make dataloader_idx arg in validation_step optional
             if self.on_gpu:
-                batch = move_to_cuda(batch, self.root_gpu)
+                device = 'mps' if self.use_mps else self.root_gpu
+                batch = move_to_device(batch, device)
             args = [batch, batch_idx]
             if self.use_ddp:
                 output = task(*args)
@@ -260,7 +269,10 @@ class Trainer:
             self.evaluate(self.task, False, 'Sanity Val', max_batches=self.num_sanity_val_steps)
         # clear cache before training
         if self.on_gpu:
-            torch.cuda.empty_cache()
+            if self.use_mps:
+                torch.mps.empty_cache()
+            else:
+                torch.cuda.empty_cache()
         dataloader = task_ref.train_dataloader()
         epoch = self.current_epoch
         # run all epochs
@@ -321,9 +333,10 @@ class Trainer:
                         param.requires_grad = True
 
             # forward pass
-            with autocast(enabled=self.amp):
+            with autocast('cpu' if not self.on_gpu else ('mps' if self.use_mps else 'cuda'), enabled=self.amp):
                 if self.on_gpu:
-                    batch = move_to_cuda(copy.copy(batch), self.root_gpu)
+                    device = 'mps' if self.use_mps else self.root_gpu
+                    batch = move_to_device(copy.copy(batch), device)
                 args = [batch, batch_idx, opt_idx]
                 if self.use_ddp:
                     output = self.task(*args)
@@ -388,7 +401,10 @@ class Trainer:
             getattr(task_ref, k).load_state_dict(v)
 
         if self.on_gpu:
-            task_ref.cuda(self.root_gpu)
+            if self.use_mps:
+                task_ref.to('mps')
+            else:
+                task_ref.cuda(self.root_gpu)
         # load training state (affects trainer only)
         self.best_val_results = checkpoint['checkpoint_callback_best']
         self.global_step = checkpoint['global_step']
@@ -410,12 +426,13 @@ class Trainer:
                 return
             try:
                 optimizer.load_state_dict(opt_state)
-                # move optimizer to GPU 1 weight at a time
+                # move optimizer to GPU/MPS 1 weight at a time
                 if self.on_gpu:
+                    device = 'mps' if self.use_mps else f'cuda:{self.root_gpu}'
                     for state in optimizer.state.values():
                         for k, v in state.items():
                             if isinstance(v, torch.Tensor):
-                                state[k] = v.cuda(self.root_gpu)
+                                state[k] = v.to(device)
             except ValueError:
                 print("| WARMING: optimizer parameters not match !!!")
         try:

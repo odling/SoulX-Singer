@@ -139,8 +139,8 @@ def _clear_target_meta_unless_example(_audio, skip_count):
 
 
 def _get_device() -> str:
-    """Use CUDA if available, else CPU (e.g. for CI or CPU-only environments)."""
-    return "cuda:0" if torch.cuda.is_available() else "cpu"
+    """Use MPS if available (Apple Silicon), else CPU (e.g. for CI or CPU-only environments)."""
+    return "mps" if torch.backends.mps.is_available() else "cpu"
 
 
 def _session_dir_from_target(target_audio_path: str) -> Path:

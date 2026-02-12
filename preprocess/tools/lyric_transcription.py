@@ -195,7 +195,7 @@ class LyricTranscriber:
         self,
         zh_model_path: str,
         en_model_path: str,
-        device: str = "cuda",
+        device: str = "mps",
         *,
         verbose: bool = True,
     ):
@@ -273,7 +273,7 @@ if __name__ == "__main__":
     m = LyricTranscriber(
         zh_model_path="pretrained_models/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
         en_model_path="pretrained_models/parakeet-tdt-0.6b-v2/parakeet-tdt-0.6b-v2.nemo",
-        device="cuda"
+        device="mps"
     )
     print(m.process("example/test/asr_zh.wav", language="Mandarin"))
     print(m.process("example/test/asr_en.wav", language="English"))

@@ -996,7 +996,7 @@ def load_checkpoint(build_model_func, cfg, ckpt_path):
 def load_vocos_model(
     ckpt_path: str | None = None,
     config: DictConfig = None,
-    device: str = "cuda",
+    device: str = "mps",
 ):
     """Load Vocos vocoder.
 

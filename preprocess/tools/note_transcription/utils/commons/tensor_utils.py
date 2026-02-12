@@ -70,23 +70,47 @@ def move_to_cpu(tensors):
     return ret
 
 
-def move_to_cuda(batch, gpu_id=0):
-    # base case: object can be directly moved using `cuda` or `to`
-    if callable(getattr(batch, 'cuda', None)):
-        return batch.cuda(gpu_id, non_blocking=True)
-    elif callable(getattr(batch, 'to', None)):
-        return batch.to(torch.device('cuda', gpu_id), non_blocking=True)
+def move_to_device(batch, device=None):
+    """Move batch to specified device (MPS, CUDA, or CPU).
+    
+    Args:
+        batch: Data to move (tensor, list, tuple, or dict)
+        device: Target device. If None, uses MPS if available, else CPU.
+    """
+    if device is None:
+        if torch.backends.mps.is_available():
+            device = torch.device('mps')
+        else:
+            device = torch.device('cpu')
+    elif isinstance(device, int):
+        # Legacy support for GPU ID - now just use MPS or CPU
+        if torch.backends.mps.is_available():
+            device = torch.device('mps')
+        else:
+            device = torch.device('cpu')
+    elif isinstance(device, str):
+        device = torch.device(device)
+    
+    # base case: object can be directly moved using `to`
+    if callable(getattr(batch, 'to', None)):
+        return batch.to(device, non_blocking=True)
     elif isinstance(batch, list):
         for i, x in enumerate(batch):
-            batch[i] = move_to_cuda(x, gpu_id)
+            batch[i] = move_to_device(x, device)
         return batch
     elif isinstance(batch, tuple):
         batch = list(batch)
         for i, x in enumerate(batch):
-            batch[i] = move_to_cuda(x, gpu_id)
+            batch[i] = move_to_device(x, device)
         return tuple(batch)
     elif isinstance(batch, dict):
         for k, v in batch.items():
-            batch[k] = move_to_cuda(v, gpu_id)
+            batch[k] = move_to_device(v, device)
         return batch
     return batch
+
+
+# Alias for backward compatibility
+def move_to_cuda(batch, gpu_id=0):
+    """Legacy alias for move_to_device. Uses MPS on Apple Silicon."""
+    return move_to_device(batch, device=None)

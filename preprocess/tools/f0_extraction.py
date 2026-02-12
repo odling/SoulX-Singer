@@ -285,7 +285,7 @@ class RMVPE:
     def __init__(self, model_path: str, is_half, device=None):
         self.is_half = is_half
         if device is None:
-            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            device = "mps" if torch.backends.mps.is_available() else "cpu"
         self.device = torch.device(device) if isinstance(device, str) else device
         
         self.mel_extractor = MelSpectrogram(
@@ -522,6 +522,6 @@ if __name__ == "__main__":
 
     pe = F0Extractor(
         model_path,
-        device="cuda",
+        device="mps",
     )
     f0 = pe.process(audio_path)

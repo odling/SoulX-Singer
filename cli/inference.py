@@ -16,7 +16,7 @@ from soulxsinger.utils.data_processor import DataProcessor
 def build_model(
     model_path: str,
     config: DictConfig,
-    device: str = "cuda",
+    device: str = "mps",
 ):
     """
     Build the model from the pre-trained model path and model configuration.
@@ -24,7 +24,7 @@ def build_model(
     Args:
         model_path (str): Path to the checkpoint file.
         config (DictConfig): Model configuration.
-        device (str, optional): Device to use. Defaults to "cuda".
+        device (str, optional): Device to use. Defaults to "mps".
 
     Returns:
         Tuple[torch.nn.Module, torch.nn.Module]: The initialized model and vocoder.
@@ -124,7 +124,7 @@ def main(args, config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--device", type=str, default="mps")
     parser.add_argument("--model_path", type=str, default='pretrained_models/soulx-singer/model.pt')
     parser.add_argument("--config", type=str, default='soulxsinger/config/soulxsinger.yaml')
     parser.add_argument("--prompt_wav_path", type=str, default='example/audio/zh_prompt.wav')

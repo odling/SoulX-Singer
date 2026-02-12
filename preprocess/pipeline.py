@@ -138,7 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--audio_path", type=str, required=True, help="Path to the input audio file")
     parser.add_argument("--save_dir", type=str, required=True, help="Directory to save the output files")
     parser.add_argument("--language", type=str, default="Mandarin", help="Language of the audio")
-    parser.add_argument("--device", type=str, default="cuda:0", help="Device to run the models on")
+    parser.add_argument("--device", type=str, default="mps", help="Device to run the models on")
     parser.add_argument("--vocal_sep", type=bool, default=True, help="Whether to perform vocal separation")
     parser.add_argument("--max_merge_duration", type=int, default=60000, help="Maximum merged segment duration in milliseconds")    
     args = parser.parse_args()

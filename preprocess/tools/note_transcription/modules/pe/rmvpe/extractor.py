@@ -104,7 +104,7 @@ def extract_worker(rank, wav_fns: list, id_and_sizes=None, ckpt=None, sr=24000, 
     loader = build_dataloader(dataset, shuffle=False, max_tokens=max_tokens, max_sentences=bsz, use_ddp=num_gpus > 1)
     loader = tqdm(loader, desc=f'| Processing f0 in [n_ranks={num_gpus}; max_tokens={max_tokens}; max_sentences={bsz}]') if rank == 0 else loader
 
-    device = torch.device(f"cuda:{int(rank)}")
+    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device(f"cuda:{int(rank)}")
     model = RMVPE(ckpt, device=device)
     f0_res_dict = {}
     for batch in loader:
@@ -130,7 +130,7 @@ def extract_worker(rank, wav_fns: list, id_and_sizes=None, ckpt=None, sr=24000, 
 
 # old version
 def extract_one_process(wav_fns: list, id_and_sizes=None, ckpt=None, sr=24000, hop_size=128, bsz=128, max_tokens=100000,
-             fmax=900, fmin=50, device='cuda'):
+             fmax=900, fmin=50, device='mps'):
     assert ckpt is not None
     rmvpe = RMVPE(ckpt, device=device)
     if id_and_sizes is None:
@@ -173,8 +173,11 @@ def extract_one_process(wav_fns: list, id_and_sizes=None, ckpt=None, sr=24000, h
             f0_res[idx] = f0s[i]
 
     if rmvpe is not None:
-        rmvpe.release_cuda()
-        torch.cuda.empty_cache()
+        rmvpe.release_device()
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+        elif torch.cuda.is_available():
+            torch.cuda.empty_cache()
         rmvpe = None
 
     return f0_res

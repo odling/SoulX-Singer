@@ -69,11 +69,19 @@ class MemTracker(object):
         return np.sum(sizes) / 1024**2
 
     def get_allocate_usage(self):
-        return torch.cuda.memory_allocated() / 1024**2
+        if torch.backends.mps.is_available():
+            # MPS doesn't have memory_allocated, return tensor usage instead
+            return self.get_tensor_usage()
+        elif torch.cuda.is_available():
+            return torch.cuda.memory_allocated() / 1024**2
+        return 0
 
     def clear_cache(self):
         gc.collect()
-        torch.cuda.empty_cache()
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+        elif torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     def print_all_gpu_tensor(self, file=None):
         for x in self.get_tensors():

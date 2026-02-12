@@ -322,7 +322,7 @@ def manual_seed(seed: int) -> None:
     """
     Initialize random seeds for reproducibility.
 
-    Sets the seed across Python's `random`, NumPy, and PyTorch (CPU and CUDA)
+    Sets the seed across Python's `random`, NumPy, and PyTorch (CPU, MPS, and CUDA)
     libraries, and updates the `PYTHONHASHSEED` environment variable. This helps
     ensure deterministic behavior where possible, though some GPU operations
     may still introduce nondeterminism.
@@ -337,9 +337,12 @@ def manual_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if multi-GPU
-    torch.backends.cudnn.deterministic = False
+    if torch.backends.mps.is_available():
+        torch.mps.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # if multi-GPU
+        torch.backends.cudnn.deterministic = False
     os.environ["PYTHONHASHSEED"] = str(seed)
 
 
@@ -485,7 +488,8 @@ def setup_ddp(rank: int, world_size: int) -> None:
         if dist.get_rank()==0:
             print(f'NCCL are not available. Using "gloo" backend.')
 
-    torch.cuda.set_device(rank)
+    if torch.cuda.is_available():
+        torch.cuda.set_device(rank)
 
 
 def cleanup_ddp() -> None:

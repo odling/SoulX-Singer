@@ -283,7 +283,7 @@ def infer_sample(
     return out
 
 
-def load_rosvot_models(ckpt, config="", wbd_ckpt="", wbd_config="", device="cuda:0", verbose=False, thr=0.85):
+def load_rosvot_models(ckpt, config="", wbd_ckpt="", wbd_config="", device="mps", verbose=False, thr=0.85):
     """
     Load models once to reuse across multiple items.
     """
@@ -353,7 +353,7 @@ class NoteTranscriber:
         *,
         rosvot_config_path: str = "",
         rwbd_config_path: str = "",
-        device: str = "cuda:0",
+        device: str = "mps",
         thr: float = 0.85,
         verbose: bool = True,
     ):
@@ -364,7 +364,7 @@ class NoteTranscriber:
             config: Optional config YAML path for ROSVOT.
             wbd_ckpt: Optional word-boundary checkpoint path.
             wbd_config: Optional config YAML path for RWBD.
-            device: Torch device string, e.g. ``"cuda:0"`` / ``"cpu"``.
+            device: Torch device string, e.g. ``"mps"`` / ``"cpu"``.
             thr: Note boundary threshold.
             verbose: Whether to print verbose logs.
         """
@@ -515,7 +515,7 @@ if __name__ == "__main__":
     m = NoteTranscriber(
         rosvot_model_path="pretrained_models/rosvot/rosvot/model.pt", 
         rwbd_model_path="pretrained_models/rosvot/rwbd/model.pt", 
-        device="cuda"
+        device="mps"
     )
     out = m.process(item)
 
