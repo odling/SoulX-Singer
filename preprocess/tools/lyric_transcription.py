@@ -129,22 +129,40 @@ class _ASRZhModel:
 
 
 class _ASREnModel:
-    """English ASR wrapper for NeMo Parakeet-TDT."""
+    """English ASR wrapper - uses Whisper (Apple Silicon compatible) or NeMo as fallback."""
 
     def __init__(self, model_path: str, device: str):
+        self.device = device
+        self.model_path = model_path
+        self.use_whisper = False
+        self.model = None
+        
+        # Try Whisper first (better Apple Silicon support)
         try:
-            import nemo.collections.asr as nemo_asr  # type: ignore
-        except Exception as e:  # pragma: no cover
-            raise ImportError(
-                "NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. "
-                "Install it in the active environment, then retry."
-            ) from e
-
-        self.model = nemo_asr.models.ASRModel.restore_from(
-            restore_path=model_path,
-            map_location=device,
-        )
-        self.model.eval()
+            import whisper
+            # Use base or small model for speed, can be changed to medium/large for accuracy
+            self.model = whisper.load_model("base", device=device if device != "mps" else "cpu")
+            self.use_whisper = True
+            print("[ASR English] Using OpenAI Whisper (Apple Silicon compatible)")
+        except ImportError:
+            pass
+        
+        # Fallback to NeMo if Whisper not available
+        if not self.use_whisper:
+            try:
+                import nemo.collections.asr as nemo_asr  # type: ignore
+                self.model = nemo_asr.models.ASRModel.restore_from(
+                    restore_path=model_path,
+                    map_location=device,
+                )
+                self.model.eval()
+                print("[ASR English] Using NeMo Parakeet-TDT")
+            except Exception as e:
+                raise ImportError(
+                    "English ASR requires either 'openai-whisper' or 'nemo_toolkit'. "
+                    "For Apple Silicon, install whisper: pip install openai-whisper\n"
+                    "For NVIDIA GPUs, install NeMo: pip install nemo_toolkit"
+                ) from e
 
     @staticmethod
     def _clean_word(word: str) -> str:
@@ -158,7 +176,24 @@ class _ASREnModel:
         word_ts = ts.get("word")
         return word_ts if isinstance(word_ts, list) else []
 
-    def process(self, wav_fn: str) -> Tuple[List[str], List[float]]:
+    def _process_whisper(self, wav_fn: str) -> Tuple[List[str], List[float]]:
+        """Process with Whisper model."""
+        result = self.model.transcribe(wav_fn, word_timestamps=True, language="en")
+        
+        raw_words: List[str] = []
+        raw_timestamps: List[List[float]] = []
+        
+        for segment in result.get("segments", []):
+            for word_info in segment.get("words", []):
+                word = self._clean_word(word_info.get("word", ""))
+                if word:
+                    raw_words.append(word)
+                    raw_timestamps.append([word_info.get("start", 0.0), word_info.get("end", 0.0)])
+        
+        return raw_words, raw_timestamps
+
+    def _process_nemo(self, wav_fn: str) -> Tuple[List[str], List[float]]:
+        """Process with NeMo model."""
         outputs = self.model.transcribe(
             [wav_fn],
             timestamps=True,
@@ -176,6 +211,14 @@ class _ASREnModel:
                 if word:
                     raw_words.append(word)
                     raw_timestamps.append([s, e])
+        
+        return raw_words, raw_timestamps
+
+    def process(self, wav_fn: str) -> Tuple[List[str], List[float]]:
+        if self.use_whisper:
+            raw_words, raw_timestamps = self._process_whisper(wav_fn)
+        else:
+            raw_words, raw_timestamps = self._process_nemo(wav_fn)
 
         words, durs = _build_words_with_gaps(raw_words, raw_timestamps, wav_fn)
 
