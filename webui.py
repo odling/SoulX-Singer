@@ -138,22 +138,9 @@ def _clear_target_meta_unless_example(_audio, skip_count):
     return None, 0
 
 
-def _get_device(force_device: str | None = None) -> str:
-    """Use MPS if available (Apple Silicon), else CPU (e.g. for CI or CPU-only environments).
-    
-    Args:
-        force_device: If provided, use this device instead of auto-detecting.
-                      Also checks SOULX_DEVICE environment variable.
-    """
-    if force_device:
-        return force_device
-    # Check environment variable
-    env_device = os.environ.get("SOULX_DEVICE")
-    if env_device:
-        return env_device
-    return "mps" if torch.backends.mps.is_available() else "cpu"
-
-
+def _get_device() -> str:
+    """Use CUDA if available, else CPU (e.g. for CI or CPU-only environments)."""
+    return "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 def _session_dir_from_target(target_audio_path: str) -> Path:
@@ -793,22 +780,10 @@ def render_interface() -> gr.Blocks:
 
 if __name__ == "__main__":
     import argparse
-    import sys
-    
-    # Parse args early to set device before module-level AppState init
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=7860, help="Gradio server port")
     parser.add_argument("--share", action="store_true", help="Create public link")
-    parser.add_argument("--device", type=str, default=None, choices=["cpu", "mps", "cuda"],
-                        help="Force device (default: auto-detect, MPS on Apple Silicon)")
     args = parser.parse_args()
-
-    # Set environment variable for device override
-    if args.device:
-        os.environ["SOULX_DEVICE"] = args.device
-        print(f"Using device: {args.device}")
-        # Reinitialize APP_STATE with new device
-        APP_STATE.__init__()
 
     page = render_interface()
     page.queue()

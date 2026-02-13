@@ -333,7 +333,8 @@ class Trainer:
                         param.requires_grad = True
 
             # forward pass
-            with autocast('cpu' if not self.on_gpu else ('mps' if self.use_mps else 'cuda'), enabled=self.amp):
+            # autocast only supports 'cuda' and 'cpu'; use 'cpu' when on MPS
+            with autocast('cpu' if (not self.on_gpu or self.use_mps) else 'cuda', enabled=self.amp and not self.use_mps):
                 if self.on_gpu:
                     device = 'mps' if self.use_mps else self.root_gpu
                     batch = move_to_device(copy.copy(batch), device)

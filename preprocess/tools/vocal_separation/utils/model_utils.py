@@ -98,11 +98,11 @@ def demix(
 
     use_amp = getattr(config.training, 'use_amp', True)
 
-    # Use device-agnostic autocast - disable AMP on MPS for stability
+    # autocast only supports 'cuda' and 'cpu'; use 'cpu' when on MPS (AMP disabled there anyway)
     device_type = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
-    # Disable AMP on MPS as it can cause memory issues
+    autocast_device = 'cpu' if device_type == 'mps' else device_type
     amp_enabled = use_amp and device_type == 'cuda'
-    with torch.amp.autocast(device_type=device_type, enabled=amp_enabled):
+    with torch.amp.autocast(device_type=autocast_device, enabled=amp_enabled):
         with torch.inference_mode():
             # Initialize result and counter tensors
             req_shape = (num_instruments,) + mix.shape

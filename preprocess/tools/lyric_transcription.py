@@ -5,6 +5,7 @@ import re
 import time
 from typing import Any, Dict, List, Tuple
 
+import torch
 import librosa
 import numpy as np
 from funasr import AutoModel
@@ -128,6 +129,14 @@ class _ASRZhModel:
         return words, word_durs
 
 
+def _is_apple_silicon() -> bool:
+    """True when running on Apple Silicon (MPS available). NeMo is not supported there."""
+    try:
+        return bool(torch.backends.mps.is_available())
+    except Exception:
+        return False
+
+
 class _ASREnModel:
     """English ASR wrapper - uses Whisper (Apple Silicon compatible) or NeMo as fallback."""
 
@@ -136,18 +145,34 @@ class _ASREnModel:
         self.model_path = model_path
         self.use_whisper = False
         self.model = None
-        
-        # Try Whisper first (better Apple Silicon support)
+        use_apple_silicon = _is_apple_silicon()
+
+        # On Apple Silicon use only Whisper (NeMo is not supported)
+        # Otherwise try Whisper first, then NeMo
         try:
             import whisper
-            # Use base or small model for speed, can be changed to medium/large for accuracy
-            self.model = whisper.load_model("base", device=device if device != "mps" else "cpu")
+            # Whisper on MPS can be unstable; use CPU for reliability on Apple Silicon
+            load_device = "cpu" if (device == "mps" or use_apple_silicon) else device
+            self.model = whisper.load_model("base", device=load_device)
             self.use_whisper = True
             print("[ASR English] Using OpenAI Whisper (Apple Silicon compatible)")
-        except ImportError:
+        except ImportError as e:
+            if use_apple_silicon:
+                raise ImportError(
+                    "English ASR on Apple Silicon requires 'openai-whisper'. "
+                    "Install it with: pip install openai-whisper"
+                ) from e
+            # Fall through to try NeMo on non-Apple Silicon
             pass
-        
-        # Fallback to NeMo if Whisper not available
+        except Exception as e:
+            if use_apple_silicon:
+                # Re-raise so the user sees the real cause (e.g. model download, ffmpeg)
+                import sys
+                print("English ASR (Whisper) load failed. Ensure: pip install openai-whisper, and ffmpeg installed.", file=sys.stderr)
+                raise
+            pass
+
+        # Fallback to NeMo only on non-Apple Silicon (NVIDIA / CUDA)
         if not self.use_whisper:
             try:
                 import nemo.collections.asr as nemo_asr  # type: ignore
@@ -289,9 +314,10 @@ class LyricTranscriber:
         lang = (language or "auto").lower()
         if lang in {"english"}:
             if self.en_model is None:
-                # Lazy-load NeMo model only when English is actually used.
+                # Lazy-load English ASR (Whisper on Apple Silicon, else NeMo) when first needed.
                 if v:
-                    print("[lyric transcription] init English ASR, please make sure NeMo is installed")
+                    hint = "Whisper" if _is_apple_silicon() else "NeMo"
+                    print(f"[lyric transcription] init English ASR ({hint})")
                 self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)
             out = self.en_model.process(wav_fn)
         else:

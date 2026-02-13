@@ -1,8 +1,20 @@
 import re
 
+import nltk
 import ToJyutping
 from g2pM import G2pM
 from g2p_en import G2p as G2pE
+
+
+def _ensure_nltk_g2p_data():
+    """Download NLTK data required by g2p_en (averaged_perceptron_tagger_eng)."""
+    try:
+        nltk.data.find("taggers/averaged_perceptron_tagger_eng")
+    except LookupError:
+        nltk.download("averaged_perceptron_tagger_eng", quiet=True)
+
+
+_ensure_nltk_g2p_data()
 
 _EN_WORD_RE = re.compile(r"^[A-Za-z]+(?:'[A-Za-z]+)*$")
 _ZH_WORD_RE = re.compile(r"[\u4e00-\u9fff]")
