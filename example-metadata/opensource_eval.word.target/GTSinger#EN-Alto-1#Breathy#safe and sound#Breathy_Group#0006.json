@@ -1,0 +1,61 @@
+{
+  "item_name": "GTSinger#EN-Alto-1#Breathy#safe and sound#Breathy_Group#0006",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Alto-1#Breathy#safe and sound#Breathy_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Alto-1",
+  "wav_fn": "gmo-svs/audio/source/GTSinger#EN-Alto-1#Breathy#safe and sound#Breathy_Group#0006.wav",
+  "txt": "and sound don't you dare look",
+  "note_text": [
+    "and",
+    "<SP>",
+    "sound",
+    "sound",
+    "sound",
+    "sound",
+    "<SP>",
+    "don't",
+    "you",
+    "dare",
+    "look"
+  ],
+  "note_dur": [
+    1.09,
+    0.57,
+    0.72,
+    0.443,
+    0.384,
+    1.023,
+    1.05,
+    0.58,
+    0.32,
+    0.52,
+    0.41
+  ],
+  "note_pitch": [
+    58,
+    0,
+    57,
+    60,
+    62,
+    57,
+    0,
+    63,
+    64,
+    62,
+    62
+  ],
+  "note_type": [
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    2,
+    2,
+    2,
+    2,
+    2
+  ]
+}

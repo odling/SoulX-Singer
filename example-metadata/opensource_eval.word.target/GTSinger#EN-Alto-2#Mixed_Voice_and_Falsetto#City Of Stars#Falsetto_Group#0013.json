@@ -1,0 +1,41 @@
+{
+  "item_name": "GTSinger#EN-Alto-2#Mixed_Voice_and_Falsetto#City Of Stars#Falsetto_Group#0013",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Alto-2#Mixed_Voice_and_Falsetto#City Of Stars#Falsetto_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Alto-2",
+  "wav_fn": "gmo-svs/audio/source/GTSinger#EN-Alto-2#Mixed_Voice_and_Falsetto#City Of Stars#Falsetto_Group#0013.wav",
+  "txt": "you never shined so brightly",
+  "note_text": [
+    "you",
+    "never",
+    "shined",
+    "so",
+    "brightly",
+    "<AP>"
+  ],
+  "note_dur": [
+    0.183,
+    0.45,
+    1.2200000000000002,
+    1.181,
+    4.33,
+    2.901
+  ],
+  "note_pitch": [
+    63,
+    63,
+    70,
+    68,
+    63,
+    0
+  ],
+  "note_type": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    1
+  ]
+}

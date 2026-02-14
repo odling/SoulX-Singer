@@ -1,0 +1,41 @@
+{
+  "item_name": "GTSinger#EN-Alto-1#Breathy#who says#Control_Group#0000",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Alto-1#Breathy#who says#Control_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Alto-1",
+  "wav_fn": "gmo-svs/audio/source/GTSinger#EN-Alto-1#Breathy#who says#Control_Group#0000.wav",
+  "txt": "you made me insecure",
+  "note_text": [
+    "<SP>",
+    "you",
+    "made",
+    "me",
+    "insecure",
+    "<SP>"
+  ],
+  "note_dur": [
+    4.11,
+    0.271,
+    0.28,
+    0.18,
+    1.25,
+    0.34
+  ],
+  "note_pitch": [
+    0,
+    56,
+    59,
+    57,
+    59,
+    0
+  ],
+  "note_type": [
+    1,
+    2,
+    2,
+    2,
+    2,
+    1
+  ]
+}

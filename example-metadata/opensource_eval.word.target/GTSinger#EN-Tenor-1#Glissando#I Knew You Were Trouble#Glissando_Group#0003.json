@@ -1,0 +1,53 @@
+{
+  "item_name": "GTSinger#EN-Tenor-1#Glissando#I Knew You Were Trouble#Glissando_Group#0003",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Tenor-1#Glissando#I Knew You Were Trouble#Glissando_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Tenor-1",
+  "wav_fn": "gmo-svs/audio/source/GTSinger#EN-Tenor-1#Glissando#I Knew You Were Trouble#Glissando_Group#0003.wav",
+  "txt": "without me without me without me",
+  "note_text": [
+    "without",
+    "me",
+    "<AP>",
+    "without",
+    "me",
+    "<AP>",
+    "without",
+    "me",
+    "<SP>"
+  ],
+  "note_dur": [
+    1.149,
+    0.45,
+    0.32,
+    1.18,
+    0.45,
+    0.32,
+    1.0470000000000002,
+    2.834,
+    0.29
+  ],
+  "note_pitch": [
+    69,
+    65,
+    0,
+    65,
+    65,
+    0,
+    65,
+    65,
+    0
+  ],
+  "note_type": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    1
+  ]
+}

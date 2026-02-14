@@ -1,0 +1,49 @@
+{
+  "item_name": "GTSinger#EN-Alto-2#Pharyngeal#My Heart Will Go On#Pharyngeal_Group#0003",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Alto-2#Pharyngeal#My Heart Will Go On#Pharyngeal_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Alto-2",
+  "wav_fn": "gmo-svs/audio/source/GTSinger#EN-Alto-2#Pharyngeal#My Heart Will Go On#Pharyngeal_Group#0003.wav",
+  "txt": "go on near far",
+  "note_text": [
+    "go",
+    "on",
+    "<AP>",
+    "near",
+    "near",
+    "far",
+    "far",
+    "<AP>"
+  ],
+  "note_dur": [
+    0.634,
+    3.473,
+    1.513,
+    0.311,
+    1.793,
+    0.473,
+    1.034,
+    0.36
+  ],
+  "note_pitch": [
+    63,
+    58,
+    0,
+    62,
+    63,
+    63,
+    65,
+    0
+  ],
+  "note_type": [
+    2,
+    2,
+    2,
+    2,
+    3,
+    2,
+    3,
+    1
+  ]
+}

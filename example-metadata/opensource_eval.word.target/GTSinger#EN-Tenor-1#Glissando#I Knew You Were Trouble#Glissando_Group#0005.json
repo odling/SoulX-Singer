@@ -1,0 +1,61 @@
+{
+  "item_name": "GTSinger#EN-Tenor-1#Glissando#I Knew You Were Trouble#Glissando_Group#0005",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Tenor-1#Glissando#I Knew You Were Trouble#Glissando_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Tenor-1",
+  "wav_fn": "gmo-svs/audio/source/GTSinger#EN-Tenor-1#Glissando#I Knew You Were Trouble#Glissando_Group#0005.wav",
+  "txt": "and i realize the blame is on me",
+  "note_text": [
+    "and",
+    "i",
+    "realize",
+    "realize",
+    "<AP>",
+    "the",
+    "blame",
+    "is",
+    "on",
+    "me",
+    "<SP>"
+  ],
+  "note_dur": [
+    0.31,
+    0.101,
+    1.9520000000000002,
+    0.6579999999999999,
+    0.31,
+    0.12,
+    0.51,
+    0.16,
+    0.54,
+    1.27,
+    0.17
+  ],
+  "note_pitch": [
+    59,
+    60,
+    67,
+    65,
+    0,
+    58,
+    57,
+    55,
+    58,
+    57,
+    0
+  ],
+  "note_type": [
+    2,
+    2,
+    2,
+    3,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    1
+  ]
+}

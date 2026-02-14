@@ -1,0 +1,41 @@
+{
+  "item_name": "GTSinger#EN-Alto-1#Pharyngeal#beauty and the beast#Pharyngeal_Group#0013",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Alto-1#Pharyngeal#beauty and the beast#Pharyngeal_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Alto-1",
+  "wav_fn": "gmo-svs/audio/source/GTSinger#EN-Alto-1#Pharyngeal#beauty and the beast#Pharyngeal_Group#0013.wav",
+  "txt": "beauty and the beast",
+  "note_text": [
+    "beauty",
+    "beauty",
+    "and",
+    "the",
+    "beast",
+    "<SP>"
+  ],
+  "note_dur": [
+    0.5,
+    1.142,
+    0.608,
+    0.511,
+    2.16,
+    1.321
+  ],
+  "note_pitch": [
+    69,
+    70,
+    69,
+    65,
+    65,
+    0
+  ],
+  "note_type": [
+    2,
+    3,
+    2,
+    2,
+    2,
+    1
+  ]
+}

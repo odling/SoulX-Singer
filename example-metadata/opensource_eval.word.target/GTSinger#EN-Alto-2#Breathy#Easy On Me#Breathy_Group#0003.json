@@ -1,0 +1,61 @@
+{
+  "item_name": "GTSinger#EN-Alto-2#Breathy#Easy On Me#Breathy_Group#0003",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Alto-2#Breathy#Easy On Me#Breathy_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Alto-2",
+  "wav_fn": "gmo-svs/audio/source/GTSinger#EN-Alto-2#Breathy#Easy On Me#Breathy_Group#0003.wav",
+  "txt": "in this silence baby let me in",
+  "note_text": [
+    "in",
+    "this",
+    "silence",
+    "baby",
+    "<AP>",
+    "let",
+    "me",
+    "in",
+    "in",
+    "in",
+    "<SP>"
+  ],
+  "note_dur": [
+    0.39,
+    0.38,
+    1.2900000000000003,
+    0.972,
+    0.38,
+    0.27,
+    0.606,
+    0.306,
+    1.051,
+    0.337,
+    1.443
+  ],
+  "note_pitch": [
+    64,
+    68,
+    66,
+    66,
+    0,
+    68,
+    66,
+    68,
+    69,
+    68,
+    0
+  ],
+  "note_type": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    3,
+    3,
+    1
+  ]
+}

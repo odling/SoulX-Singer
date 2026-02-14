@@ -1,0 +1,53 @@
+{
+  "item_name": "GTSinger#EN-Alto-1#Pharyngeal#beauty and the beast#Pharyngeal_Group#0002",
+  "dataset": "GTSinger",
+  "song_name": "GTSinger#EN-Alto-1#Pharyngeal#beauty and the beast#Pharyngeal_Group",
+  "language": "English",
+  "singer": "GTSinger#EN-Alto-1",
+  "wav_fn": "soulx-singer-eval/audio/source/GTSinger#EN-Alto-1#Pharyngeal#beauty and the beast#Pharyngeal_Group#0002.wav",
+  "txt": "then somebody bends unexpectedly",
+  "note_text": [
+    "then",
+    "then",
+    "somebody",
+    "bends",
+    "<AP>",
+    "unexpectedly",
+    "unexpectedly",
+    "unexpectedly",
+    "<SP>"
+  ],
+  "note_dur": [
+    0.46599999999999997,
+    0.234,
+    1.3030000000000002,
+    0.92,
+    0.81,
+    2.0020000000000002,
+    0.261,
+    1.737,
+    0.794
+  ],
+  "note_pitch": [
+    72,
+    71,
+    70,
+    67,
+    0,
+    66,
+    63,
+    61,
+    0
+  ],
+  "note_type": [
+    2,
+    3,
+    2,
+    2,
+    2,
+    2,
+    3,
+    3,
+    1
+  ]
+}
