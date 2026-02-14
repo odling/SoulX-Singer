@@ -105,7 +105,111 @@ def generate_f0_contour(note_pitches, durations, note_types=None,
 
 
 # ---------------------------------------------------------------------------
+# Detect if word-level data is actually phoneme-level (1:1 with phone data)
+# ---------------------------------------------------------------------------
+def is_phoneme_level(word_data, phone_data):
+    """Return True if word-level note_text is 1:1 with phone-level ph."""
+    return len(word_data["note_text"]) == len(phone_data["ph"])
+
+
+# ---------------------------------------------------------------------------
+# Collapse phoneme-level word data into true word-level entries
+# ---------------------------------------------------------------------------
+def collapse_phoneme_level(word_data, phone_data):
+    """
+    When word-level data has one entry per phoneme (1:1 with phone data),
+    collapse into true word-level entries.
+
+    Grouping rule:
+      - A new group starts on: type 1 (rest), type 2 (new singing note),
+        or when the word name changes from the previous entry.
+      - Type 3 (slur) with the same word name continues the current group.
+
+    Each group becomes one word-level entry with:
+      - text: the word name
+      - phoneme: en_PH1-PH2-... (consecutive-deduped phonemes)
+      - duration: sum of phoneme durations
+      - pitch: pitch of the first entry (the type-2 onset)
+      - type: type of the first entry
+    """
+    note_text = word_data["note_text"]
+    note_dur = word_data["note_dur"]
+    note_pitch = word_data["note_pitch"]
+    note_type = word_data["note_type"]
+    phonemes = phone_data["ph"]
+
+    groups = []  # list of dicts
+    current = None
+
+    for i in range(len(note_text)):
+        word = note_text[i]
+        ntype = note_type[i]
+        ph = phonemes[i]
+
+        # Decide: start a new group or continue the current one?
+        start_new = False
+        if current is None:
+            start_new = True
+        elif ntype in (1, 2):
+            # Rest or new singing note always starts a new group
+            start_new = True
+        elif word != current["word"]:
+            # Word name changed
+            start_new = True
+        # else: type 3 (slur) with same word → continue
+
+        if start_new:
+            if current is not None:
+                groups.append(current)
+            current = {
+                "word": word,
+                "phonemes": [ph],
+                "duration": note_dur[i],
+                "pitch": note_pitch[i],
+                "type": ntype,
+            }
+        else:
+            current["phonemes"].append(ph)
+            current["duration"] += note_dur[i]
+
+    if current is not None:
+        groups.append(current)
+
+    # Build the collapsed arrays
+    out_text = []
+    out_phoneme = []
+    out_dur = []
+    out_pitch = []
+    out_type = []
+
+    for g in groups:
+        out_text.append(g["word"])
+        out_dur.append(g["duration"])
+        out_pitch.append(g["pitch"])
+        out_type.append(g["type"])
+
+        if g["word"] in ("<SP>", "<AP>"):
+            out_phoneme.append(g["word"])
+        else:
+            # Deduplicate consecutive identical phonemes
+            # e.g. [Y, AE1, AE1] → [Y, AE1]
+            deduped = []
+            for ph in g["phonemes"]:
+                if ph in ("<SP>", "<AP>"):
+                    continue
+                if not deduped or ph != deduped[-1]:
+                    deduped.append(ph)
+            if deduped:
+                out_phoneme.append("en_" + "-".join(deduped))
+            else:
+                out_phoneme.append(g["word"])
+
+    return out_text, out_phoneme, out_dur, out_pitch, out_type
+
+
+# ---------------------------------------------------------------------------
 # Group phonemes by word using cumulative duration alignment
+# (for true word-level data where note_text has fewer entries than ph)
 # ---------------------------------------------------------------------------
 def group_phonemes_by_word(word_texts, word_durs, phonemes, ph_durs, tolerance=0.02):
     """
@@ -182,21 +286,38 @@ def convert_item(word_data, phone_data):
     """
     Convert a word-level + phone-level annotation pair into
     the SoulX-Singer target metadata format.
+
+    Handles two cases:
+      1. True word-level data (note_text has fewer entries than ph)
+         → group phonemes by cumulative duration alignment
+      2. Phoneme-level data (note_text is 1:1 with ph)
+         → collapse into word-level by grouping on type-2 boundaries
     """
     item_name = word_data["item_name"]
-    note_text = word_data["note_text"]
-    note_dur = word_data["note_dur"]
-    note_pitch = word_data["note_pitch"]
-    note_type = word_data["note_type"]
 
-    phonemes = phone_data["ph"]
-    ph_durs = phone_data["ph_durs"]
+    if is_phoneme_level(word_data, phone_data):
+        # Case 2: phoneme-level → collapse to word-level
+        out_text, out_phoneme, out_dur, out_pitch, out_type = \
+            collapse_phoneme_level(word_data, phone_data)
+    else:
+        # Case 1: true word-level → align phonemes by duration
+        note_text = word_data["note_text"]
+        note_dur = word_data["note_dur"]
+        note_pitch = word_data["note_pitch"]
+        note_type = word_data["note_type"]
+        phonemes = phone_data["ph"]
+        ph_durs = phone_data["ph_durs"]
 
-    # Group phonemes by word
-    ph_groups = group_phonemes_by_word(note_text, note_dur, phonemes, ph_durs)
+        ph_groups = group_phonemes_by_word(note_text, note_dur, phonemes, ph_durs)
+
+        out_text = note_text
+        out_phoneme = ph_groups
+        out_dur = note_dur
+        out_pitch = note_pitch
+        out_type = note_type
 
     # Generate F0 contour
-    f0_contour = generate_f0_contour(note_pitch, note_dur, note_type, ph_groups)
+    f0_contour = generate_f0_contour(out_pitch, out_dur, out_type, out_phoneme)
 
     # Compute time from F0 length (20ms per frame at 50 Hz)
     time_ms = len(f0_contour) * 20
@@ -206,11 +327,11 @@ def convert_item(word_data, phone_data):
         "index": item_name,
         "language": "English",
         "time": [0, time_ms],
-        "duration": " ".join(f"{d:.2f}" for d in note_dur),
-        "text": " ".join(note_text),
-        "phoneme": " ".join(ph_groups),
-        "note_pitch": " ".join(str(p) for p in note_pitch),
-        "note_type": " ".join(str(t) for t in note_type),
+        "duration": " ".join(f"{d:.2f}" for d in out_dur),
+        "text": " ".join(out_text),
+        "phoneme": " ".join(out_phoneme),
+        "note_pitch": " ".join(str(p) for p in out_pitch),
+        "note_type": " ".join(str(t) for t in out_type),
         "f0": " ".join(f"{f:.1f}" for f in f0_contour),
     }
 
