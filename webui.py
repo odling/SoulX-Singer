@@ -609,13 +609,13 @@ def render_interface() -> gr.Blocks:
             prompt_metadata = gr.File(
                 label=i18n("prompt_meta_label"),
                 type="filepath",
-                file_types=[".json"],
+                # No file_types so API-uploaded files (temp paths without .json) are accepted
                 interactive=True,
             )
             target_metadata = gr.File(
                 label=i18n("target_meta_label"),
                 type="filepath",
-                file_types=[".json"],
+                # No file_types so API-uploaded files (temp paths without .json) are accepted
                 interactive=True,
             )
             control_radio = gr.Radio(
